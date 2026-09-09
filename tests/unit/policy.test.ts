@@ -147,7 +147,7 @@ describe('shell-first permission policy', () => {
     );
   });
 
-  it('requires v1 static metadata and rejects metadata spoofing or mismatch', async () => {
+  it('requires v1 static metadata and rejects malformed metadata', async () => {
     const missing = await decidePermission(
       request('execute', { argv: ['pnpm', 'test'], cwd: worktree }),
       contract,
@@ -160,8 +160,13 @@ describe('shell-first permission policy', () => {
     (approvalMismatch.toolCall._meta!['reasonix.io'] as Record<string, unknown>).approvalId =
       'other';
     const approval = await decidePermission(approvalMismatch, contract, worktree);
-    expect(approval).toMatchObject({ action: 'deny' });
-    expect(approval.reason).toContain('approvalId');
+    expect(approval).toMatchObject({ action: 'allow', timeoutSeconds: 90 });
+
+    const malformedApproval = execute(['pnpm', 'test'], worktree);
+    (malformedApproval.toolCall._meta!['reasonix.io'] as Record<string, unknown>).approvalId = {};
+    const malformed = await decidePermission(malformedApproval, contract, worktree);
+    expect(malformed).toMatchObject({ action: 'deny' });
+    expect(malformed.reason).toContain('approvalId');
 
     const cwdMismatch = await decidePermission(
       execute(['pnpm', 'test'], worktree, { cwd: path.join(worktree, 'src') }),

@@ -343,8 +343,19 @@ export async function parseStaticCommand(
   ) {
     return invalidMetadata('Execute metadata has malformed argv or cwd');
   }
-  if (reasonix.approvalId !== undefined && reasonix.approvalId !== params.toolCall.toolCallId) {
-    return invalidMetadata('Execute metadata approvalId does not match the ACP toolCallId');
+  // Reasonix uses an opaque approval identifier that is not guaranteed to be
+  // the ACP permission request's toolCallId (some versions use a separate
+  // `gate-*` id for the permission envelope while retaining the original
+  // `call_*` id in reasonix.io.approvalId).  The command itself is already
+  // bound to the immutable contract below through argv/cwd validation, so do
+  // not reject a valid static command solely because those opaque ids differ.
+  // Keep validating the field's shape when it is present to avoid accepting
+  // malformed metadata.
+  if (
+    reasonix.approvalId !== undefined &&
+    (typeof reasonix.approvalId !== 'string' || reasonix.approvalId.trim().length === 0)
+  ) {
+    return invalidMetadata('Execute metadata approvalId must be a non-empty opaque string');
   }
   const raw = record(params.toolCall.rawInput);
   if (
