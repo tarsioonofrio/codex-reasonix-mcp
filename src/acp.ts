@@ -63,6 +63,9 @@ interface SessionRuntime {
   executionTimeoutSeconds: number;
   deadline?: ReturnType<typeof setTimeout>;
   completionReported: boolean;
+  lastStatus?: ReasonixStatus;
+  lastStatusSequence: number;
+  promptStartSequence: number;
 }
 
 function extensionMeta(response: InitializeResponse): unknown {
@@ -263,6 +266,21 @@ export async function cancelBestEffortThenComplete(
   await complete();
 }
 
+/**
+ * Some Reasonix versions publish the final snapshot only through the
+ * `session/status_update` notification instead of answering the explicit
+ * status request made after a prompt.
+ */
+export function usableFinalStatusFallback(
+  latest: ReasonixStatus | undefined,
+  promptStartSequence: number,
+): ReasonixStatus | undefined {
+  if (!latest || latest.sequence <= promptStartSequence || latest.state !== 'idle') {
+    return undefined;
+  }
+  return latest;
+}
+
 export function supervisedWorkerPrompt(
   prompt: string,
   executionTimeoutSeconds = DEFAULT_EXECUTION_TIMEOUT_SECONDS,
@@ -344,6 +362,7 @@ export class ReasonixProcess {
       })
       .onNotification(REASONIX_STATUS_UPDATE_METHOD, z.unknown(), async ({ params }) => {
         const update = parseReasonixStatusUpdate(params);
+        launched.process?.rememberStatus(update.status);
         if (await launched.process?.rejectEffortDrift(update)) return;
         await callbacks.onStatusUpdate(update);
       });
@@ -425,6 +444,13 @@ export class ReasonixProcess {
   private clearPromptDeadline(runtime: SessionRuntime): void {
     if (runtime.deadline) clearTimeout(runtime.deadline);
     runtime.deadline = undefined;
+  }
+
+  private rememberStatus(status: ReasonixStatus): void {
+    const runtime = this.sessions.get(status.sessionId);
+    if (!runtime || status.sequence < runtime.lastStatusSequence) return;
+    runtime.lastStatus = status;
+    runtime.lastStatusSequence = status.sequence;
   }
 
   private async stopSupervisedPrompt(runtime: SessionRuntime, error: BridgeError): Promise<void> {
@@ -597,10 +623,13 @@ export class ReasonixProcess {
       workerLane,
       executionTimeoutSeconds,
       completionReported: false,
+      lastStatusSequence: 0,
+      promptStartSequence: 0,
     };
     this.sessions.set(response.sessionId, runtime);
     await this.configureSession(response, requestedEffort, workerLane);
     const status = await this.status(response.sessionId);
+    this.rememberStatus(status);
     await this.verifyEffectiveStatus(status, worktree, networkEnabled, requestedEffort, workerLane);
     return { sessionId: response.sessionId, status };
   }
@@ -630,8 +659,11 @@ export class ReasonixProcess {
       workerLane,
       executionTimeoutSeconds,
       completionReported: false,
+      lastStatusSequence: 0,
+      promptStartSequence: 0,
     });
     const status = await this.status(sessionId);
+    this.rememberStatus(status);
     await this.verifyEffectiveStatus(status, worktree, networkEnabled, requestedEffort, workerLane);
     return status;
   }
@@ -641,6 +673,7 @@ export class ReasonixProcess {
     if (!runtime) throw new BridgeError('invalid_state', `Unknown ACP session: ${sessionId}`);
     runtime.activePrompt = true;
     runtime.completionReported = false;
+    runtime.promptStartSequence = runtime.lastStatusSequence;
     this.clearPromptDeadline(runtime);
     runtime.deadline = setTimeout(() => {
       void this.stopSupervisedPrompt(
@@ -671,8 +704,9 @@ export class ReasonixProcess {
         let status: ReasonixStatus | undefined;
         try {
           status = await this.status(sessionId);
+          this.rememberStatus(status);
         } catch {
-          // Prompt completion still needs to be surfaced; malformed status fails closed upstream.
+          status = usableFinalStatusFallback(runtime.lastStatus, runtime.promptStartSequence);
         }
         if (status) assertReasonixEffort(status, runtime.requestedEffort);
         runtime.completionReported = true;

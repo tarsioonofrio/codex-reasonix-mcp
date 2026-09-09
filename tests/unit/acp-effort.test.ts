@@ -6,6 +6,7 @@ import {
   cancelBestEffortThenComplete,
   desiredEffort,
   supervisedWorkerPrompt,
+  usableFinalStatusFallback,
 } from '../../src/acp.js';
 import { DEFAULT_EXECUTION_TIMEOUT_SECONDS, REASONING_EFFORTS } from '../../src/types.js';
 import type { ReasonixStatus } from '../../src/reasonix-status.js';
@@ -74,5 +75,23 @@ describe('Reasonix worker supervision prompt', () => {
       },
     );
     expect(completed).toBe(true);
+  });
+});
+
+describe('Reasonix final status fallback', () => {
+  it('accepts a newer idle status published by session/status_update', () => {
+    const latest = {
+      sequence: 8,
+      state: 'idle',
+    } as ReasonixStatus;
+    expect(usableFinalStatusFallback(latest, 7)).toBe(latest);
+  });
+
+  it.each([
+    ['missing status', undefined, 7],
+    ['stale status', { sequence: 7, state: 'idle' } as ReasonixStatus, 7],
+    ['running status', { sequence: 8, state: 'running' } as ReasonixStatus, 7],
+  ])('rejects %s as a final status fallback', (_name, latest, promptStartSequence) => {
+    expect(usableFinalStatusFallback(latest, promptStartSequence)).toBeUndefined();
   });
 });
