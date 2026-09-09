@@ -706,6 +706,9 @@ export class ReasonixProcess {
           status = await this.status(sessionId);
           this.rememberStatus(status);
         } catch {
+          // The ACP transport may resolve the prompt response before the
+          // asynchronous notification handler has recorded the final update.
+          await new Promise<void>((resolve) => setImmediate(resolve));
           status = usableFinalStatusFallback(runtime.lastStatus, runtime.promptStartSequence);
         }
         if (status) assertReasonixEffort(status, runtime.requestedEffort);
