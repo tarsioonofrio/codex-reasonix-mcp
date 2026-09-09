@@ -7,7 +7,6 @@ import { BridgeError } from '../errors.js';
 import { transitionTask } from '../lifecycle.js';
 import { classifyStaticCommand } from '../policy.js';
 import {
-  assertSourceClean,
   discoverRepository,
   resolveBaseCommit,
   resolveGitIdentity,
@@ -208,7 +207,10 @@ export class OperationController implements OperationAccess {
       );
     }
 
-    await assertSourceClean(repository);
+    // The source checkout may contain user work in this workflow: Reasonix is
+    // the only writer and the worker always runs in its own worktree. Source
+    // changes are still captured by CollisionController at review/finalize;
+    // overlapping paths pause the task instead of blocking delegation here.
     await resolveGitIdentity(repository);
     this.assertVerifierPolicyCompatible(contract);
     const baseRef = input.base_ref?.trim() || 'HEAD';

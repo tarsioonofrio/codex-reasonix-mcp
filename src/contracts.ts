@@ -67,10 +67,9 @@ export const taskContractSchema = z
       .default([]),
     write_scope: z
       .array(z.string().min(1).max(1_024))
-      .min(1)
       .max(1_000)
       .describe(
-        'Exclusive repository-relative write allowlist; every path not listed is already denied.',
+        'Exclusive repository-relative write allowlist; every path not listed is already denied. An empty list makes the task read-only.',
       ),
     forbidden_scope: z
       .array(z.string().min(1).max(1_024))
@@ -760,15 +759,20 @@ export async function assertPathInsideWorktree(
 }
 
 export function renderFastPrompt(taskId: string, contract: TaskContractV1, hash: string): string {
+  const readOnly = contract.write_scope.length === 0;
   const lines = [
     `Edit task delegated by Codex supervisor (task ${taskId}, contract sha256 ${hash}).`,
     '',
-    'Make exactly the contract-scoped file edits in this isolated worktree, then stop and report.',
+    readOnly
+      ? 'This is a read-only task: inspect and verify only; do not create, edit, or remove files.'
+      : 'Make exactly the contract-scoped file edits in this isolated worktree, then stop and report.',
     'Do not commit, stage, push, merge, rebase, change branches, access credentials, enable',
     'network, or expand scope. Do not create plans, todos, goal sessions, AutoResearch runs,',
     'review or task skills, or subagents. Do not run acceptance or verification checks; Codex',
-    'will review, verify, stage, and create the only commit. Pause on any ambiguity listed by the',
-    'contract.',
+    readOnly
+      ? 'will review and verify the unchanged worktree. Pause on any ambiguity listed by the contract.'
+      : 'will review, verify, stage, and create the only commit. Pause on any ambiguity listed by the',
+    ...(!readOnly ? ['contract.'] : []),
     '',
     `Objective: ${contract.objective}`,
     `User outcome: ${contract.user_outcome}`,
@@ -776,8 +780,9 @@ export function renderFastPrompt(taskId: string, contract: TaskContractV1, hash:
     'Verified context:',
     ...contract.verified_context.map((item) => `- ${item.path}: ${item.reason}`),
     '',
-    'Write scope:',
-    ...contract.write_scope.map((item) => `- ${item}`),
+    ...(readOnly
+      ? ['Write scope: (empty; no file changes are permitted)']
+      : ['Write scope:', ...contract.write_scope.map((item) => `- ${item}`)]),
     '',
     'Forbidden scope (always wins):',
     ...contract.forbidden_scope.map((item) => `- ${item}`),
@@ -795,12 +800,18 @@ export function renderFastPrompt(taskId: string, contract: TaskContractV1, hash:
 }
 
 export function renderGoalPrompt(taskId: string, contract: TaskContractV1, hash: string): string {
+  const readOnly = contract.write_scope.length === 0;
   const lines = [
     `Goal delegated by Codex supervisor (task ${taskId}, contract sha256 ${hash}).`,
     '',
-    'Implement the contract in this isolated worktree. Do not commit, stage, push, merge, rebase,',
-    'change branches, access credentials, enable network, or expand scope. Pause on any ambiguity',
-    'listed by the contract. Codex will review, verify, stage, and create the only commit.',
+    readOnly
+      ? 'This is a read-only task: inspect and verify the contract in this isolated worktree; do not create, edit, or remove files.'
+      : 'Implement the contract in this isolated worktree.',
+    'Do not commit, stage, push, merge, rebase, change branches, access credentials, enable network,',
+    'or expand scope. Pause on any ambiguity listed by the contract.',
+    ...(readOnly
+      ? ['Codex will review and verify the unchanged worktree.']
+      : ['Codex will review, verify, stage, and create the only commit.']),
     '',
     `Objective: ${contract.objective}`,
     `User outcome: ${contract.user_outcome}`,
@@ -808,8 +819,9 @@ export function renderGoalPrompt(taskId: string, contract: TaskContractV1, hash:
     'Verified context:',
     ...contract.verified_context.map((item) => `- ${item.path}: ${item.reason}`),
     '',
-    'Write scope:',
-    ...contract.write_scope.map((item) => `- ${item}`),
+    ...(readOnly
+      ? ['Write scope: (empty; no file changes are permitted)']
+      : ['Write scope:', ...contract.write_scope.map((item) => `- ${item}`)]),
     '',
     'Forbidden scope (always wins):',
     ...contract.forbidden_scope.map((item) => `- ${item}`),

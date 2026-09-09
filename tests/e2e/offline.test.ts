@@ -58,16 +58,16 @@ async function commitFixtureScript(
 }
 
 describe('offline Codex -> Reasonix -> Codex flow', () => {
-  it('rejects a dirty source before starting Reasonix', async () => {
+  it('accepts dirty source when it does not overlap the worker write scope', async () => {
     const repository = await createGitRepository();
     const runtime = await runtimeFixture();
     await writeFile(path.join(repository, 'dirty.txt'), 'dirty\n', 'utf8');
-    await expect(
-      runtime.delegate(
-        { task_id: 'dirty-source', contract: contractFixture() },
-        sandboxMeta(repository),
-      ),
-    ).rejects.toMatchObject({ code: 'dirty_repository' });
+    const delegated = await runtime.delegate(
+      { task_id: 'dirty-source', contract: contractFixture(), worker_lane: 'deep' },
+      sandboxMeta(repository),
+    );
+    expect(delegated.state).toBe('review_required');
+    expect(await readFile(path.join(repository, 'dirty.txt'), 'utf8')).toBe('dirty\n');
   });
 
   it('rejects a policy-incompatible verifier before worker provisioning', async () => {

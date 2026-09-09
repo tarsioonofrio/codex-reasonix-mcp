@@ -223,7 +223,9 @@ export class FinalizationController implements FinalizationAccess {
       waitTimeoutMs(input.wait_timeout_seconds),
       (record) => record.status !== 'verifying',
       context,
-      'Bridge is verifying and creating the isolated worker commit',
+      task.contract.write_scope.length === 0
+        ? 'Bridge is verifying the read-only task'
+        : 'Bridge is verifying and creating the isolated worker commit',
     );
     if (waited.timedOut) {
       throw new BridgeError(
@@ -407,6 +409,24 @@ export class FinalizationController implements FinalizationAccess {
     await this.dependencies.collision.guardTask(taskId, 'before_staging');
     task = await this.dependencies.store.loadTask(taskId);
     assertApprovalCurrent(task, expectedReviewRevision, expectedReviewTreeHash, 'before_staging');
+
+    // A contract with an empty write_scope is intentionally read-only. The
+    // worker must not change files, and a successful read-only task has no
+    // isolated commit to cherry-pick.
+    if (task.contract.write_scope.length === 0 && files.length === 0) {
+      await this.dependencies.store.recordEvent(
+        taskId,
+        'task_completed',
+        { files: [], treeSha256: expectedReviewTree },
+        (record) => {
+          delete record.commitHash;
+          transitionTask(record, 'completed', 'completed');
+        },
+      );
+      await this.dependencies.collision.releaseLease(task.repository.id, task.taskId);
+      return;
+    }
+
     let stagedByBridge = false;
     let commitCreated = false;
     let createdCommitHash: string | undefined;

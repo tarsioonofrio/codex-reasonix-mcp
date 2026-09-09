@@ -22,7 +22,7 @@ interface TaskContractV1 {
   objective: string;
   user_outcome: string;
   verified_context: Array<{ path: string; reason: string }>;
-  write_scope: string[];
+  write_scope: string[]; // empty means read-only
   forbidden_scope: string[];
   invariants: string[];
   non_goals: string[];
@@ -66,9 +66,11 @@ semantic problems together rather than stopping at the first issue.
 
 Contract rules:
 
-- `write_scope` is required, nonempty, and already acts as the exclusive write
-  allowlist: every unlisted path is denied. `forbidden_scope` is only an extra
-  sensitive carve-out inside a broader write scope and always wins. Never use
+- `write_scope` is required and already acts as the exclusive write allowlist:
+  every unlisted path is denied. An empty `write_scope` makes the task
+  read-only: the worker must not create, edit, or remove files, and a successful
+  finalize completes without creating a worker commit. `forbidden_scope` is only
+  an extra sensitive carve-out inside a broader write scope and always wins. Never use
   `**/*` or another catch-all that matches a concrete `write_scope` target.
 - Paths/globs and command cwd are repository-relative, POSIX-normalized, never
   absolute, and may not contain a `..` segment.

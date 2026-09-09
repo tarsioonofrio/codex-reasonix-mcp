@@ -67,8 +67,9 @@ Delegation/finalization require writable `codex/sandbox-state-meta`.
 
 ## Dirty repository or source collision
 
-Task creation requires a clean source worktree. During a task, source dirty
-paths and committed movement since base are compared with `write_scope`. An
+Task creation does not require a clean source worktree. The Worker starts from
+the recorded `HEAD` in its own worktree, while source dirty paths and committed
+movement since base are compared with `write_scope` at task checkpoints. An
 overlap or unavailable source pauses/blocks and appears in `source_collision`.
 Resolve ownership yourself, then inspect before resume. The bridge never
 resets, stashes, or deletes user changes.

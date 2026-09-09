@@ -41,7 +41,7 @@ Standard and deep doctor both fail their required configuration check when the
 setting is absent or lower.
 
 Task input `reasoning_effort` overrides `CODEX_REASONIX_EFFORT`; when both are
-absent the bridge uses `medium`. `minimal` is no longer accepted on the wire or
+absent the bridge uses `low`. `minimal` is no longer accepted on the wire or
 in new configuration; persisted legacy records that used it remain readable.
 There is no implicit inheritance from Codex's chat effort control. A resumed
 task retains its stored effort.

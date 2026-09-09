@@ -7,9 +7,11 @@ finalize derive cwd/network permission from `codex/sandbox-state-meta`,
 canonicalize the Git repository, and require a writable profile. Native Windows
 is rejected; use WSL.
 
-The source worktree must be clean at task creation. The bridge never stashes,
-resets, or absorbs user changes. Each task owns a separate worker branch and
-worktree below private state.
+The source worktree may contain user changes at task creation. The bridge never
+stashes, resets, or absorbs them. Each task owns a separate worker branch and
+worktree below private state. At review and finalization checkpoints, source
+changes are compared with the task `write_scope`; an overlap pauses the task
+for explicit ownership resolution, while unrelated source work is preserved.
 
 ## Structured edits and shell commands
 

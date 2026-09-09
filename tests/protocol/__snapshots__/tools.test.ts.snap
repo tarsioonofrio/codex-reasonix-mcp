@@ -231,14 +231,13 @@ exports[`stable MCP surface > advertises codex sandbox metadata and exactly thre
               "type": "array",
             },
             "write_scope": {
-              "description": "Exclusive repository-relative write allowlist; every path not listed is already denied.",
+              "description": "Exclusive repository-relative write allowlist; every path not listed is already denied. An empty list makes the task read-only.",
               "items": {
                 "maxLength": 1024,
                 "minLength": 1,
                 "type": "string",
               },
               "maxItems": 1000,
-              "minItems": 1,
               "type": "array",
             },
           },

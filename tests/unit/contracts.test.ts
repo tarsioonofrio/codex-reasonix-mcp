@@ -54,6 +54,13 @@ describe('TaskContractV1', () => {
     expect(contract).not.toHaveProperty('allowed_commands');
   });
 
+  it('accepts an empty write scope for read-only tasks', () => {
+    const contract = parseTaskContract({ ...contractFixture(), write_scope: [] });
+
+    expect(contract.write_scope).toEqual([]);
+    expect(isWriteAllowed(contract, 'result.txt')).toBe(false);
+  });
+
   it('allows repository root as verified context but not as write scope', () => {
     const contract = parseTaskContract({
       ...contractFixture(),
@@ -388,5 +395,14 @@ describe('TaskContractV1', () => {
     expect(prompt).toContain('Do not commit, stage, push, merge, rebase');
     expect(prompt).toContain('[ac_result] (automated)');
     expect(prompt).toContain(JSON.stringify(contract.verification[0]?.argv));
+  });
+
+  it('renders an explicit read-only Goal prompt without a sentinel path', () => {
+    const contract = parseTaskContract({ ...contractFixture(), write_scope: [] });
+    const prompt = renderGoalPrompt('task-read-only', contract, contractHash(contract));
+
+    expect(prompt).toContain('read-only task');
+    expect(prompt).toContain('Write scope: (empty; no file changes are permitted)');
+    expect(prompt).not.toContain('\n- result.txt');
   });
 });
