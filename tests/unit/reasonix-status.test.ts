@@ -95,6 +95,48 @@ describe('Reasonix status usage compatibility', () => {
     expect(statusToUsage(parsed)).not.toHaveProperty('totalTokens');
   });
 
+  it('maps the Reasonix v1.38.x source usage field to usageSource', () => {
+    const status = v1190Status();
+    const usage = status.usage as Record<string, Record<string, unknown>>;
+    const turn = { ...usage.turn };
+    const cumulative = { ...usage.cumulative };
+    delete turn.usageSource;
+    delete cumulative.usageSource;
+    delete turn.cacheHitRatio;
+    delete cumulative.cacheHitRatio;
+    const parsed = parseReasonixStatus({
+      ...status,
+      usage: {
+        turn: {
+          ...turn,
+          source: 'executor',
+          estimated: true,
+          events: 2,
+          pricedEvents: 2,
+          costQuote: {
+            original: { amount: '0.001', currency: 'USD' },
+            valuations: { USD: { money: { amount: '0.001', currency: 'USD' } } },
+            selected: { amount: '0.001', currency: 'USD' },
+            billingMode: 'payg',
+            estimated: true,
+            costComplete: true,
+            displayComplete: true,
+            complete: true,
+            displayStatus: 'matched',
+          },
+        },
+        cumulative: {
+          ...cumulative,
+          source: 'executor',
+          estimated: true,
+          events: 2,
+          pricedEvents: 2,
+        },
+      },
+    });
+    expect(statusToUsage(parsed).usageSource).toBe('executor');
+  });
+
   it('accepts the Reasonix v1.38.x goal runtime and cost display metadata', () => {
     const status = v1190Status();
     const usage = status.usage as Record<string, Record<string, unknown>>;

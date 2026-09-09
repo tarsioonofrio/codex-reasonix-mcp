@@ -139,6 +139,56 @@ function pick(value: unknown, keys: readonly string[]): Record<string, unknown> 
   return Object.fromEntries(keys.filter((key) => key in source).map((key) => [key, source[key]]));
 }
 
+function normalizeUsageTotals(value: unknown): Record<string, unknown> {
+  const source = record(value);
+  const normalized = pick(source, [
+    'promptTokens',
+    'completionTokens',
+    'reasoningTokens',
+    'cacheHitTokens',
+    'cacheMissTokens',
+    'cacheHitRatio',
+    'estimatedCost',
+    'currency',
+    'usageSource',
+    'totalTokens',
+    'estimated',
+    'costComplete',
+    'displayComplete',
+    'displayStatus',
+    'costQuote',
+  ]);
+  // Reasonix v1.38.x calls this canonical field `source`; preserve the
+  // bridge's stable `usageSource` name while projecting wire metadata out.
+  if (!('usageSource' in normalized) && typeof source.source === 'string') {
+    normalized.usageSource = source.source;
+  }
+  if (!('cacheHitRatio' in normalized)) {
+    const cacheHitTokens = normalized.cacheHitTokens;
+    const cacheMissTokens = normalized.cacheMissTokens;
+    if (typeof cacheHitTokens === 'number' && typeof cacheMissTokens === 'number') {
+      const total = cacheHitTokens + cacheMissTokens;
+      normalized.cacheHitRatio = total > 0 ? cacheHitTokens / total : null;
+    }
+  }
+  if ('costQuote' in normalized) {
+    const quote = record(normalized.costQuote);
+    const original = pick(quote.original, ['amount', 'currency']);
+    normalized.costQuote = {
+      ...pick(quote, [
+        'estimated',
+        'costComplete',
+        'displayComplete',
+        'complete',
+        'displayStatus',
+        'incompleteReason',
+      ]),
+      ...(Object.keys(original).length === 2 ? { original } : {}),
+    };
+  }
+  return normalized;
+}
+
 /**
  * Keep the wire boundary tolerant of additive Reasonix metadata while the
  * canonical schema above remains strict for persisted/contract data. Reasonix
@@ -195,40 +245,8 @@ function normalizeStatus(raw: unknown): unknown {
   ]);
   const usage = record(source.usage);
   normalized.usage = {
-    turn: pick(usage.turn, [
-      'promptTokens',
-      'completionTokens',
-      'reasoningTokens',
-      'cacheHitTokens',
-      'cacheMissTokens',
-      'cacheHitRatio',
-      'estimatedCost',
-      'currency',
-      'usageSource',
-      'totalTokens',
-      'estimated',
-      'costComplete',
-      'displayComplete',
-      'displayStatus',
-      'costQuote',
-    ]),
-    cumulative: pick(usage.cumulative, [
-      'promptTokens',
-      'completionTokens',
-      'reasoningTokens',
-      'cacheHitTokens',
-      'cacheMissTokens',
-      'cacheHitRatio',
-      'estimatedCost',
-      'currency',
-      'usageSource',
-      'totalTokens',
-      'estimated',
-      'costComplete',
-      'displayComplete',
-      'displayStatus',
-      'costQuote',
-    ]),
+    turn: normalizeUsageTotals(usage.turn),
+    cumulative: normalizeUsageTotals(usage.cumulative),
   };
   return normalized;
 }
