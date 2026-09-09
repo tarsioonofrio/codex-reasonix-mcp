@@ -5,6 +5,7 @@ import { Readable, Writable } from 'node:stream';
 
 import * as acp from '@agentclientprotocol/sdk';
 import picomatch from 'picomatch';
+import { z, ZodError } from 'zod';
 import type {
   InitializeResponse,
   NewSessionResponse,
@@ -24,8 +25,8 @@ import {
   REASONIX_STATUS_METHOD,
   REASONIX_STATUS_UPDATE_METHOD,
   REASONIX_STEER_METHOD,
-  reasonixStatusSchema,
-  reasonixStatusUpdateSchema,
+  parseReasonixStatus,
+  parseReasonixStatusUpdate,
   type ReasonixStatus,
   type ReasonixStatusUpdate,
 } from './reasonix-status.js';
@@ -217,6 +218,11 @@ export function laneWorkMode(
   workMode: ReasonixStatus['workMode'],
   workerLane: WorkerLane,
 ): boolean {
+  // Reasonix v1.38.x no longer exposes work_mode as a session option and
+  // reports its neutral `balanced` posture for both lanes. The lane's mode
+  // (normal vs goal) and fast-lane event restrictions remain enforced; when
+  // the capability exists, economy/delivery are still required.
+  if (workMode === 'balanced') return true;
   return workerLane === 'fast' ? workMode === 'economy' : workMode === 'delivery';
 }
 
@@ -336,14 +342,11 @@ export class ReasonixProcess {
       .onNotification(acp.methods.client.session.update, async ({ params }) => {
         await callbacks.onSessionUpdate(params);
       })
-      .onNotification(
-        REASONIX_STATUS_UPDATE_METHOD,
-        reasonixStatusUpdateSchema,
-        async ({ params }) => {
-          if (await launched.process?.rejectEffortDrift(params)) return;
-          await callbacks.onStatusUpdate(params);
-        },
-      );
+      .onNotification(REASONIX_STATUS_UPDATE_METHOD, z.unknown(), async ({ params }) => {
+        const update = parseReasonixStatusUpdate(params);
+        if (await launched.process?.rejectEffortDrift(update)) return;
+        await callbacks.onStatusUpdate(update);
+      });
 
     const input = Writable.toWeb(child.stdin) as WritableStream<Uint8Array>;
     const output = Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>;
@@ -483,7 +486,10 @@ export class ReasonixProcess {
     // fast lane: Reasonix economy + normal session; deep lane: delivery + Goal.
     const workMode = workerLane === 'fast' ? 'economy' : 'delivery';
     const modeId = workerLane === 'fast' ? 'normal' : 'goal';
-    options = await this.setSelect(response.sessionId, 'work_mode', workMode);
+    const workModeOption = findOption(options, 'work_mode');
+    if (workModeOption) {
+      options = await this.setSelect(response.sessionId, workModeOption.id, workMode);
+    }
     const approval = findOption(options, 'tool_approval');
     if (!approval || !flattenOptions(approval).some((item) => item.value === 'ask')) {
       throw new BridgeError('reasonix_incompatible', 'Reasonix tool_approval=ask is unavailable');
@@ -505,16 +511,17 @@ export class ReasonixProcess {
       REASONIX_STATUS_METHOD,
       { sessionId },
     );
-    const parsed = reasonixStatusSchema.safeParse(raw);
-    if (!parsed.success) {
+    try {
+      return parseReasonixStatus(raw);
+    } catch (error) {
+      if (!(error instanceof ZodError)) throw error;
       throw new BridgeError('reasonix_incompatible', 'Malformed Reasonix status snapshot', {
-        issues: parsed.error.issues.map((issue) => ({
+        issues: error.issues.map((issue) => ({
           path: issue.path.join('.'),
           message: issue.message,
         })),
       });
     }
-    return parsed.data;
   }
 
   private async verifyEffectiveStatus(

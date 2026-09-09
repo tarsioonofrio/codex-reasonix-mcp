@@ -80,6 +80,12 @@ describe('worker lane posture', () => {
         status({ goal: { status: 'none' }, mode: 'normal', workMode: 'delivery' }),
       ),
     ).toMatch(/fast lane requires economy work mode/);
+    expect(
+      laneViolation(
+        fast,
+        status({ goal: { status: 'none' }, mode: 'normal', workMode: 'balanced' }),
+      ),
+    ).toBeUndefined();
   });
 
   it('requires delivery + Goal on the deep lane', () => {
@@ -99,6 +105,12 @@ describe('worker lane posture', () => {
     expect(
       laneViolation(deep, status({ goal: { status: 'none' }, mode: 'goal', workMode: 'economy' })),
     ).toMatch(/deep lane requires delivery work mode/);
+    expect(
+      laneViolation(
+        deep,
+        status({ goal: { status: 'running' }, mode: 'goal', workMode: 'balanced' }),
+      ),
+    ).toBeUndefined();
   });
 
   it('flags AutoResearch, review/task skills, and subagents on fast sessions only', () => {

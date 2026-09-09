@@ -61,9 +61,9 @@ describe('configuration parsing', () => {
     );
   });
 
-  it('defaults Reasonix effort to medium and lets explicit config override the environment', () => {
+  it('defaults Reasonix effort to low and lets explicit config override the environment', () => {
     delete process.env.CODEX_REASONIX_EFFORT;
-    expect(loadConfig().reasoningEffort).toBe('medium');
+    expect(loadConfig().reasoningEffort).toBe('low');
     process.env.CODEX_REASONIX_EFFORT = 'high';
     expect(loadConfig({ reasoningEffort: 'low' }).reasoningEffort).toBe('low');
   });

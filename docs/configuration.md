@@ -8,7 +8,7 @@ after changing its MCP environment.
 | `REASONIX_BIN`                       | `reasonix`               | Reasonix executable or absolute local build path                          |
 | `CODEX_REASONIX_STATE_DIR`           | platform state directory | Private tasks, worktrees, locks, archives, tombstones, hooks, and metrics |
 | `CODEX_REASONIX_MODEL`               | `deepseek-v4-flash`      | Required Reasonix model selector                                          |
-| `CODEX_REASONIX_EFFORT`              | `medium`                 | Default task effort: low, medium, high, or max (minimal is legacy-only)   |
+| `CODEX_REASONIX_EFFORT`              | `low`                    | Default task effort: low, medium, high, or max (minimal is legacy-only)   |
 | `CODEX_REASONIX_NETWORK`             | off                      | Request sandbox egress; Codex metadata must also permit it                |
 | `CODEX_REASONIX_SECRET_SCANNER_ARGV` | unset                    | JSON argv array for an additional local secret scanner                    |
 

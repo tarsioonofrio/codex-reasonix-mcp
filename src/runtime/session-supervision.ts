@@ -44,12 +44,12 @@ export function laneViolation(task: TaskRecord, status: ReasonixStatus): string 
     if (status.mode !== 'normal') return `fast lane forbids session mode: ${status.mode}`;
     if (status.goal.status !== 'none')
       return `fast lane forbids Goal activity: ${status.goal.status}`;
-    if (status.workMode !== 'economy')
+    if (!['economy', 'balanced'].includes(status.workMode))
       return `fast lane requires economy work mode: ${status.workMode}`;
     return undefined;
   }
   if (status.mode !== 'goal') return `deep lane requires goal session mode: ${status.mode}`;
-  if (status.workMode !== 'delivery')
+  if (!['delivery', 'balanced'].includes(status.workMode))
     return `deep lane requires delivery work mode: ${status.workMode}`;
   return undefined;
 }

@@ -28,7 +28,11 @@ export interface BridgeConfig {
 }
 
 function parseReasoningEffort(value: string | undefined): ReasoningEffort {
-  const effort = value?.trim() || 'medium';
+  // Reasonix v1.38.x advertises low/high/max (plus auto/disabled), but not
+  // medium. Keep medium accepted for explicit legacy configurations while
+  // choosing a value that works with the current ACP capability set by
+  // default.
+  const effort = value?.trim() || 'low';
   if (!(WIRE_REASONING_EFFORTS as readonly string[]).includes(effort)) {
     throw new BridgeError(
       'invalid_request',

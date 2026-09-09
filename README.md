@@ -135,7 +135,7 @@ snapshot by mapping `review_revision` to `expected_review_revision` and
 subagents, 600-second default deadline); choose `worker_lane: "deep"` only for
 explicitly long-horizon Delivery + Goal work (3,600-second default).
 `reasoning_effort` is selected per task (`low`, `medium`, `high`, or `max`);
-precedence is task field, then `CODEX_REASONIX_EFFORT`, then `medium`. Choose
+precedence is task field, then `CODEX_REASONIX_EFFORT`, then `low`. Choose
 the lowest sufficient effort. `execution_timeout_seconds` is a persisted
 per-task execution deadline; new tasks default by lane (600 fast / 3,600 deep)
 and may request 60–14,400 seconds. The separate delegate wait remains bounded
